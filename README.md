@@ -46,7 +46,7 @@ Install all dependancies with poetry
 
 Install git hooks
 
-`pre-commit install-hooks`
+`pre-commit install`
 
 ### Upload to pypi
 
