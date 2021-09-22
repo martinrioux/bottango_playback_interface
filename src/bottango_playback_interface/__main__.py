@@ -1,12 +1,12 @@
-
-from dataclasses import dataclass
-import time
-import requests
 import logging
+import time
+from dataclasses import dataclass
 
-logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+import requests
+
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger()
-logger.addHandler(logging.FileHandler('bottango_python_api.log', 'a'))
+logger.addHandler(logging.FileHandler("bottango_python_api.log", "a"))
 
 
 @dataclass
@@ -21,12 +21,20 @@ class Effector:
 
 
 class PlaybackState:
-    def __init__(self, selectedAnimationIndex: int, selectedAnimationName: str, isPlaying: bool, playbackTimeInMS: int, durationInMS: int, effectors: 'list[Effector]'):
-        self.selectedAnimationIndex= selectedAnimationIndex
+    def __init__(
+        self,
+        selectedAnimationIndex: int,
+        selectedAnimationName: str,
+        isPlaying: bool,
+        playbackTimeInMS: int,
+        durationInMS: int,
+        effectors: "list[Effector]",
+    ):
+        self.selectedAnimationIndex = selectedAnimationIndex
         self.selectedAnimationName = selectedAnimationName
         self.isPlaying = isPlaying
         self.playbackTimeInMS = playbackTimeInMS
-        self.durationInMS= durationInMS
+        self.durationInMS = durationInMS
         casted_effectors = []
         for effector in effectors:
             casted_effectors.append(Effector(**effector))
@@ -45,7 +53,7 @@ class BottangoPlaybackInterface:
         self.port = port
         self._animations: dict[str, int] = {}
         self._test_connection()
-        animations = self.refresh_animation_list()
+        animations = self.get_animation_list()
         logging.info(f"Available animations are: {animations}")
 
     def __request(self, url, params=None) -> dict:
@@ -57,7 +65,7 @@ class BottangoPlaybackInterface:
             else:
                 response = requests.put(f"http://{self.host}:{self.port}/{url}", json=params)
             response.raise_for_status()
-        except (ConnectionRefusedError, requests.exceptions.ConnectionError) as e:
+        except (ConnectionRefusedError, requests.exceptions.ConnectionError):
             logging.error(f"Error connecting to bottango API at {self.host}:{self.port}")
             raise SystemExit(f"Error connecting to bottango API at {self.host}:{self.port}")
         except requests.exceptions.RequestException as e:
@@ -82,7 +90,7 @@ class BottangoPlaybackInterface:
         response = self.__request(self.CAN_ANIMATE_URL)
         return response.get("canAnimate", False)
 
-    def refresh_animation_list(self) -> 'list[str]':
+    def get_animation_list(self) -> "list[str]":
         """
         Get available animations. Returns a list of strings. Index order is what is used
         to call play animation etc. in other requests
@@ -108,7 +116,7 @@ class BottangoPlaybackInterface:
         """
         response = self.__request(self.CURRENT_ANIMATION_URL)
         # animation_index = response.get('selectedAnimationIndex', None)
-        animation_name = response.get('selectedAnimationName', None)
+        animation_name = response.get("selectedAnimationName", None)
         return animation_name
 
     def get_playback_state(self) -> PlaybackState:
@@ -145,12 +153,12 @@ class BottangoPlaybackInterface:
 
     def resume_animation(self):
         requestParams = {}
-        requestParams['isPlaying'] = True
+        requestParams["isPlaying"] = True
         self.__request(self.PLAYBACK_STATE_URL, requestParams)
 
     def pause_animation(self):
         requestParams = {}
-        requestParams['isPlaying'] = False
+        requestParams["isPlaying"] = False
         self.__request(self.PLAYBACK_STATE_URL, requestParams)
 
     def play_animation(self, animation_name, playback_time_ms=0):
@@ -163,24 +171,18 @@ class BottangoPlaybackInterface:
         int playbackTimeInMS
         """
 
-        self.refresh_animation_list()
+        self.get_animation_list()
 
         requestParams = {}
+
         an_index = self._animations.get(animation_name, None)
         if an_index is not None:
-            requestParams['selectedAnimationIndex'] = an_index
-        requestParams['isPlaying'] = False
-        self.__request(self.PLAYBACK_STATE_URL, requestParams)
-
+            requestParams["selectedAnimationIndex"] = an_index
         # requestParams['selectedAnimationName'] = animation_name
-        requestParams['playbackTimeInMS'] = int(5000)
 
-        requestParams = {}
-        self.__request(self.PLAYBACK_STATE_URL, requestParams)
+        requestParams["playbackTimeInMS"] = int(playback_time_ms)
+        requestParams["isPlaying"] = True
 
-        requestParams = {}
-        requestParams['isPlaying'] = True
-        requestParams['playbackTimeInMS'] = int(5000)
         self.__request(self.PLAYBACK_STATE_URL, requestParams)
 
     def emergency_stop(self):
@@ -191,15 +193,23 @@ class BottangoPlaybackInterface:
         request data:
         None
         """
-        self.__request(self.EMERGENCY_STOP, '')
+        self.__request(self.EMERGENCY_STOP, "")
 
     def wait_animation_done(self, timeout=None):
         timer = time.time()
+        last_playback_time = -1
         while True:
             time.sleep(0.02)
             state = self.get_playback_state()
             if state.playbackTimeInMS >= state.durationInMS and state.isPlaying is False:
                 break
+            if last_playback_time == state.playbackTimeInMS:
+                logging.warning("Animation playback seems to have stopped")
+                break
+            state.playbackTimeInMS = last_playback_time
             if timeout is not None and time.time() - timer > timeout:
-                logging.error(f"Timeout while waiting for animation '{state.selectedAnimationName}' to finish. Timeout was {timeout}s, state is: {state.__dict__}")
+                logging.error(
+                    f"Timeout while waiting for animation '{state.selectedAnimationName}' to"
+                    f" finish. Timeout was {timeout}s, state is: {state.__dict__}"
+                )
                 break
