@@ -1,3 +1,9 @@
+"""
+Bottango Playback Interface
+By Martin Rioux
+2021
+"""
+
 import logging
 import time
 from dataclasses import dataclass
@@ -197,16 +203,21 @@ class BottangoPlaybackInterface:
 
     def wait_animation_done(self, timeout=None):
         timer = time.time()
+        last_change_time = time.time()
         last_playback_time = -1
         while True:
             time.sleep(0.02)
             state = self.get_playback_state()
             if state.playbackTimeInMS >= state.durationInMS and state.isPlaying is False:
                 break
-            if last_playback_time == state.playbackTimeInMS:
+            if time.time() - last_change_time > 1 and last_playback_time != 0.0:
                 logging.warning("Animation playback seems to have stopped")
                 break
-            state.playbackTimeInMS = last_playback_time
+
+            if last_playback_time != state.playbackTimeInMS:
+                last_playback_time = state.playbackTimeInMS
+                last_change_time = time.time()
+
             if timeout is not None and time.time() - timer > timeout:
                 logging.error(
                     f"Timeout while waiting for animation '{state.selectedAnimationName}' to"

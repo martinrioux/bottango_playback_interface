@@ -76,7 +76,7 @@ password = pypi_password
 Run
 
 ```python
-poetry install
+poetry build
 twine check dist/*
 twine upload dist/*
 ```
